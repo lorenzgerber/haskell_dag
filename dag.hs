@@ -1,5 +1,6 @@
 import Data.List
-
+import Data.Maybe
+import Control.Arrow
 
 data Vertex w = Vertex {vId :: Id
                        , vWeight :: Weight w
@@ -32,5 +33,32 @@ addEdge (Dag a b) c d e = Dag a (edge:b)
     where edge = Edge {origin = c, destination = d, eWeight = e}
 
 
+getDestinations :: [Edge w] -> Int -> ([Int], [Int])
+getDestinations edges chosenOrigin = ([chosenOrigin], map (destination) 
+                                     $ filter (\edge -> origin edge == chosenOrigin) edges)
 
+getOrigins :: [Edge w] -> [Int]
+getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges 
+
+
+prepareList :: Dag v e -> [([Int],[Int])]
+prepareList dag = map (getDestinations (edges dag)) (getOrigins (edges dag)) 
+
+cycleDetect :: [([Int],[Int])] -> [[Int]]
+cycleDetect xs = filter ((>1).length)
+                 $ map (\[(a,as), (b,bs)] -> (a `intersect` bs) ++ (b `intersect`as))
+                 $ combs 2 xs
+
+combs 0 _ = [[]]
+combs _ [] = []
+combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
+
+makePrecede :: [([Int],[Int])] -> [Int]
+makePrecede a = foldl makePrecede' [] a
+
+
+makePrecede' :: [Int] -> ([Int],[Int]) -> [Int]
+makePrecede' ts (x,xs)  = nub $ case elemIndex x ts of
+                                          Just i  -> uncurry(++) $ first(++xs) $ splitAt i ts
+                                          _       -> ts ++ xs ++ x:[]
 
