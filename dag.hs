@@ -1,13 +1,26 @@
 import Data.List
 
 
-data Vertex = Vertex Id Weight deriving (Show)
-data Edge = Edge Weight Vertex Vertex deriving (Show)
-data Dag = Dag {vertices :: [ Vertex ], edges :: [ Edge ]} deriving (Show)   
+data Vertex w = Vertex {vId :: Int
+                       , vWeight :: Weight w
+                       } deriving (Show)
 
-type Id = Int
-type Weight = Int
+data Edge w = Edge { eWeight :: Weight w
+                   , origin :: Int
+                   , destination :: Int
+                   } deriving (Show)
 
-addVertex :: Dag -> Weight -> Dag
-addVertex (Dag v w) weight = Dag (vertex:v) w
-    where vertex = Vertex ((length v)+97) weight
+data Dag v e = Dag { vertices :: [ Vertex v ]
+               , edges :: [ Edge e ]
+               } deriving (Show)   
+
+data Weight a = Weight a deriving (Show, Eq)
+
+weightInt :: Int -> Weight Int
+weightInt a = Weight a
+
+
+addVertex :: Dag v e -> Weight v -> Dag v e 
+addVertex (Dag a b) c = Dag (vertex:a) b
+   where vertex = Vertex {vId = (length a), vWeight = c}  
+ 
