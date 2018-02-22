@@ -15,7 +15,7 @@ data Dag v e = Dag { vertices :: [ Vertex v ]
                , edges :: [ Edge e ]
                } deriving (Show)   
 
-data Weight a = Weight a deriving (Show, Eq)
+data Weight a = Weight a deriving (Show, Eq, Ord)
 
 weightInt :: Int -> Weight Int
 weightInt a = Weight a
@@ -58,8 +58,8 @@ combs 0 _ = [[]]
 combs _ [] = []
 combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
 
-makePrecede :: [([Int],[Int])] -> [Int]
-makePrecede a = reverse $ foldl makePrecede' [] a
+makePrecede :: Dag v e -> [Int]
+makePrecede a = reverse $ foldl makePrecede' [] $ prepareList a
 
 
 makePrecede' :: [Int] -> ([Int],[Int]) -> [Int]
@@ -67,7 +67,24 @@ makePrecede' ts (x,xs)  = nub $ case elemIndex (head x) ts of
                                           Just i  -> uncurry(++) $ first(++xs) $ splitAt i ts
                                           _       -> ts ++ xs ++ x
 
+visitVertex :: Destination -> Dag v e ->  Weight w -> Origin -> Weight w
+visitVertex dest dag weight orig
+    | (snd $ getDestinations (edges dag) orig) == [] = weight
+      
 
+--    | (snd $ getDestinations (edges dag) orig) /= [] = map (visitVertex dest dag weight) (snd $ getDestinations (edges dag) orig)
+--    | orig == dest = weight
+
+
+getWeightVertex :: Id -> Dag v e -> Weight v
+getWeightVertex a b = vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
+
+getWeightEdge :: Origin -> Destination -> Dag v e -> Weight e
+getWeightEdge a b c = eWeight $ head $ filter (\edge -> origin edge == a && destination edge == b) (edges c)
+
+plus :: (Num a) => Weight a -> Weight a -> Weight a
+(Weight a) `plus` (Weight b) = Weight (a + b)
+ 
 
 
 -- example data
@@ -79,7 +96,7 @@ e = addVertex d (Weight 10)
 f = addVertex e (Weight 10)
 g = addVertex f (Weight 10)
 h = addEdge g 5 6 (Weight 10)
-i = addEdge h 6 5 (Weight 10)
+i = addEdge h 6 1 (Weight 10)
 j = addEdge i 0 1 (Weight 10)
 k = addEdge j 0 2 (Weight 10)
 l = addEdge k 1 3 (Weight 10)
