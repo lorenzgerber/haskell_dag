@@ -58,7 +58,20 @@ makePrecede a = foldl makePrecede' [] a
 
 
 makePrecede' :: [Int] -> ([Int],[Int]) -> [Int]
-makePrecede' ts (x,xs)  = nub $ case elemIndex x ts of
+makePrecede' ts (x,xs)  = nub $ case elemIndex (head x) ts of
                                           Just i  -> uncurry(++) $ first(++xs) $ splitAt i ts
-                                          _       -> ts ++ xs ++ x:[]
+                                          _       -> ts ++ xs ++ x
+
+
+
+
+-- example data
+a = addVertex (Dag [][]) (Weight 10)
+b = addVertex a (Weight 10)
+c = addVertex b (Weight 10)
+d = addEdge c 0 1 (Weight 10)
+e = addEdge d 0 2 (Weight 10)
+f = addEdge e 1 2 (Weight 10)
+g = addEdge f 2 1 (Weight 10)
+
 
