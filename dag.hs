@@ -28,8 +28,13 @@ addVertex :: Dag v e -> Weight v -> Dag v e
 addVertex (Dag a b) c = Dag (vertex:a) b
     where vertex = Vertex {vId = (length a), vWeight = c}  
 
-addEdge :: Dag v e -> Origin -> Destination -> Weight e ->  Dag v e
-addEdge (Dag a b) c d e = Dag a (edge:b)
+addEdge :: Dag v e -> Origin -> Destination -> Weight e -> Dag v e
+addEdge a b c d
+    | (not.null) $ cycleDetect $ prepareList $ addEdge' a b c d = error $ "Cycle detected!"
+    | otherwise = addEdge' a b c d  
+
+addEdge' :: Dag v e -> Origin -> Destination -> Weight e ->  Dag v e
+addEdge' (Dag a b) c d e = Dag a (edge:b)
     where edge = Edge {origin = c, destination = d, eWeight = e}
 
 
@@ -54,7 +59,7 @@ combs _ [] = []
 combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
 
 makePrecede :: [([Int],[Int])] -> [Int]
-makePrecede a = foldl makePrecede' [] a
+makePrecede a = reverse $ foldl makePrecede' [] a
 
 
 makePrecede' :: [Int] -> ([Int],[Int]) -> [Int]
@@ -69,9 +74,15 @@ makePrecede' ts (x,xs)  = nub $ case elemIndex (head x) ts of
 a = addVertex (Dag [][]) (Weight 10)
 b = addVertex a (Weight 10)
 c = addVertex b (Weight 10)
-d = addEdge c 0 1 (Weight 10)
-e = addEdge d 0 2 (Weight 10)
-f = addEdge e 1 2 (Weight 10)
-g = addEdge f 2 1 (Weight 10)
-
-
+d = addVertex c (Weight 10)
+e = addVertex d (Weight 10)
+f = addVertex e (Weight 10)
+g = addVertex f (Weight 10)
+h = addEdge g 5 6 (Weight 10)
+i = addEdge h 6 5 (Weight 10)
+j = addEdge i 0 1 (Weight 10)
+k = addEdge j 0 2 (Weight 10)
+l = addEdge k 1 3 (Weight 10)
+m = addEdge l 2 4 (Weight 10)
+n = addEdge m 2 3 (Weight 10)
+o = addEdge n 3 4 (Weight 10)
