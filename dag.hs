@@ -76,6 +76,18 @@ pathCost' a b c
     |length b == 1 = getWeightVertex a (b!!0) `plus` c
     |otherwise     = pathCost' a (tail b) (getWeightVertex a (b!!0) `plus` getWeightEdge a (b!!0) (b!!1) `plus` c)
 
+chopList :: [Int] -> Int -> Int -> [Int]
+chopList a b c
+    | b == c = [c]
+    | otherwise = chopList' a b c
+
+chopList' :: [Int] -> Int -> Int -> [Int]
+chopList' a b c
+    | a!!0 == b && b == c = reverse a
+    | a!!0 == b = chopList' (reverse a) c c
+    | otherwise = chopList' (tail a) b c
+
+
 getOutBoundEdges :: Dag w -> Origin -> [Edge w]
 getOutBoundEdges b a = filter (\edge -> origin edge == a) (edges b)
 
@@ -86,8 +98,22 @@ getWeightEdge :: Dag w -> Origin -> Destination -> Weight w
 getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
 
 
- 
+longestPath :: Dag w -> Int -> Int -> [Int]
+longestPath a b c = longestPath' a (chopList (topoSort a) b c) b c
 
+longestPath' :: Dag w -> [Int] -> Int -> Int -> [Int] 
+longestPath' a b c d 
+    | c == d = [d]
+--    | otherwise = maximumBy (comparing (pathCost a b)) 
+--                  [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c d)]
+--                             let start' = ((tail b)!!0) 
+--                             let g' = tail b
+--                             let path = longestPath' a g' start' d ]
+
+
+
+incomingVertices :: Dag w -> Int -> [Int]
+incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
 
 -- example data
 a = addVertex (Dag [][]) (Weight 10)
