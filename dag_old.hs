@@ -1,6 +1,5 @@
 import Data.List
 import Data.Maybe
-import Data.Ord
 import Control.Arrow
 
 data Vertex w = Vertex {vId :: Id
@@ -18,12 +17,15 @@ data Dag w = Dag { vertices :: [ Vertex w ]
 
 data Weight a = Weight a deriving (Show, Eq, Ord)
 
-type Id = Int
-type Origin = Int
-type Destination = Int
+weightInt :: Int -> Weight Int
+weightInt a = Weight a
 
 plus :: (Num a) => Weight a -> Weight a -> Weight a
 (Weight a) `plus` (Weight b) = Weight (a + b)
+
+type Id = Int
+type Origin = Int
+type Destination = Int
 
 addVertex :: Dag w -> Weight w -> Dag w 
 addVertex (Dag a b) c = Dag (vertex:a) b
@@ -31,25 +33,13 @@ addVertex (Dag a b) c = Dag (vertex:a) b
 
 addEdge :: Dag w -> Origin -> Destination -> Weight w -> Dag w
 addEdge a b c d
-    | (not.null) $ cycleDetect $ addEdge' a b c d = error $ "Cycle detected!"
+    | (not.null) $ cycleDetect $ prepareList $ addEdge' a b c d = error $ "Cycle detected!"
     | otherwise = addEdge' a b c d  
 
 addEdge' :: Dag w -> Origin -> Destination -> Weight w ->  Dag w
 addEdge' (Dag a b) c d e = Dag a (edge:b)
     where edge = Edge {origin = c, destination = d, eWeight = e}
 
-cycleDetect :: Dag w -> [[Int]]
-cycleDetect dag = filter ((>1).length)
-                 $ map (\[(a,as), (b,bs)] -> (a `intersect` bs) ++ (b `intersect`as))
-                 $ combs 2 $ map (getDestinations (edges dag)) (getOrigins (edges dag))
-
-topoSort :: Dag w -> [Int]
-topoSort dag = reverse $ foldl topoSort' [] $ map (getDestinations (edges dag)) (getOrigins (edges dag))
-
-topoSort' :: [Int] -> ([Int],[Int]) -> [Int]
-topoSort' ts (x,xs)  = nub $ case elemIndex (head x) ts of
-                                          Just i  -> uncurry(++) $ first(++xs) $ splitAt i ts
-                                          _       -> ts ++ xs ++ x
 
 getDestinations :: [Edge w] -> Int -> ([Int], [Int])
 getDestinations edges chosenOrigin = ([chosenOrigin], map (destination) 
@@ -58,23 +48,41 @@ getDestinations edges chosenOrigin = ([chosenOrigin], map (destination)
 getOrigins :: [Edge w] -> [Int]
 getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges 
 
+
+prepareList :: Dag w -> [([Int],[Int])]
+prepareList dag = map (getDestinations (edges dag)) (getOrigins (edges dag)) 
+
+cycleDetect :: [([Int],[Int])] -> [[Int]]
+cycleDetect xs = filter ((>1).length)
+                 $ map (\[(a,as), (b,bs)] -> (a `intersect` bs) ++ (b `intersect`as))
+                 $ combs 2 xs
+
 combs 0 _ = [[]]
 combs _ [] = []
 combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
 
+makePrecede :: Dag w -> [Int]
+makePrecede a = reverse $ foldl makePrecede' [] $ prepareList a
 
-pathCost :: (Num w) => Dag w -> [Int] -> Weight w
-pathCost a b
-    |length b == 0 = error "empty path"
-    |length b == 1 = getWeightVertex a (b!!0)
-    |length b == 2 = (getWeightVertex a (b!!0)) `plus` (getWeightVertex a (b!!1)) `plus` (getWeightEdge a (b!!0) (b!!1)) 
-    |otherwise = pathCost' a (tail b) ((getWeightVertex a (b!!0)) `plus` (getWeightEdge a (b!!0) (b!!1)))
 
-pathCost' :: (Num w) => Dag w -> [Int] -> Weight w -> Weight w
-pathCost' a b c
-    |length b == 0 = c
-    |length b == 1 = getWeightVertex a (b!!0) `plus` c
-    |otherwise     = pathCost' a (tail b) (getWeightVertex a (b!!0) `plus` getWeightEdge a (b!!0) (b!!1) `plus` c)
+makePrecede' :: [Int] -> ([Int],[Int]) -> [Int]
+makePrecede' ts (x,xs)  = nub $ case elemIndex (head x) ts of
+                                          Just i  -> uncurry(++) $ first(++xs) $ splitAt i ts
+                                          _       -> ts ++ xs ++ x
+
+--processer :: TL TL_index Edge_index
+-- TL_lenght == TL_index + 1 && Edge_length == Edge_index + 1 = return TL
+-- Edge_length == Edge_index = call processer with edge_index = 0, TL_index + 1
+-- else call processer with weight applied and Edge_index + 1 
+
+
+chopTripleList a b = case elemIndex a (makePrecede b) of
+                      Just i -> drop i (makeTripleList b)
+                      _      -> error "invalid Id"
+
+
+makeTripleList :: Dag w -> [(Int, Weight w, [Edge w])]
+makeTripleList a =  zip3  (makePrecede a) (map (getWeightVertex a) (makePrecede a)) (map (getOutBoundEdges a) (makePrecede a))
 
 getOutBoundEdges :: Dag w -> Origin -> [Edge w]
 getOutBoundEdges b a = filter (\edge -> origin edge == a) (edges b)
@@ -82,8 +90,8 @@ getOutBoundEdges b a = filter (\edge -> origin edge == a) (edges b)
 getWeightVertex :: Dag w -> Id -> Weight w
 getWeightVertex b a = vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
 
-getWeightEdge :: Dag w -> Origin -> Destination -> Weight w
-getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
+getWeightEdge :: Origin -> Destination -> Dag w -> Weight w
+getWeightEdge a b c = eWeight $ head $ filter (\edge -> origin edge == a && destination edge == b) (edges c)
 
 
  
