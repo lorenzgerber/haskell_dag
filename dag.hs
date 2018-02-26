@@ -104,11 +104,11 @@ longestPath a b c = longestPath' a (chopList (topoSort a) b c) b c
 longestPath' :: Dag w -> [Int] -> Int -> Int -> [Int] 
 longestPath' a b c d 
     | c == d = [d]
---    | otherwise = maximumBy (comparing (pathCost a b)) 
---                  [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c d)]
---                             let start' = ((tail b)!!0) 
---                             let g' = tail b
---                             let path = longestPath' a g' start' d ]
+    | otherwise = maximumBy (comparing (pathCost a b)) 
+                  [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c),
+                             let start' = ((tail b)!!0) 
+                                 g' = tail b
+                                 path = longestPath' a g' start' d ]
 
 
 
