@@ -99,16 +99,31 @@ getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == o
 
 
 longestPath :: (Ord w, Num w) =>  Dag w -> Int -> Int -> [Int]
-longestPath a b c = longestPath' a (chopList (topoSort a) b c) b c
+longestPath a b c = longestPath' a (pruneDag  a (topoSort a) b c) b c  
 
 longestPath' :: (Ord w, Num w) => Dag w -> [Int] -> Int -> Int -> [Int] 
 longestPath' a b c d 
-    | c == d = [d]  
-    | otherwise = maximumBy (comparing (pathCost a)) [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c)]
+    | c == d = [c]
+    | otherwise = maximumBy (comparing (pathCost a)) [ e:path | e <- (incomingVertices a ((tail b)!!0)),
+                                                       let start' = (tail b)!!0,
+                                                       let g' = tail b,
+                                                       let path = longestPath' a g' start' d]
 
 
 incomingVertices :: Dag w -> Int -> [Int]
 incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
+
+
+
+pruneDag :: Dag w -> [Int] -> Int -> Int ->  [Int]
+pruneDag a b c d = pruneDag' a b [] c d
+
+pruneDag' :: Dag w -> [Int] -> [Int] -> Int -> Int -> [Int]
+pruneDag' a b c d e
+    | head b == e = reverse ([e] ++ c) 
+    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneDag' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
+    | otherwise = pruneDag' a (tail b) ((head b):c) d e
+
 
 -- example data
 a = addVertex (Dag [][]) (Weight 1) -- 0
