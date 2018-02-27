@@ -16,13 +16,13 @@ data Dag w = Dag { vertices :: [ Vertex w ]
                , edges :: [ Edge w ]
                } deriving (Show)   
 
-data Weight a = Weight a deriving (Show, Eq, Ord)
+data Weight w =  Weight w deriving (Show, Eq, Ord)
 
 type Id = Int
 type Origin = Int
 type Destination = Int
 
-plus :: (Num a) => Weight a -> Weight a -> Weight a
+plus :: (Num w) => Weight w -> Weight w -> Weight w
 (Weight a) `plus` (Weight b) = Weight (a + b)
 
 addVertex :: Dag w -> Weight w -> Dag w 
@@ -63,14 +63,14 @@ combs _ [] = []
 combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
 
 
-pathCost :: (Num w) => Dag w -> [Int] -> Weight w
+pathCost :: (Num w, Ord w) => Dag w -> [Int] -> Weight w
 pathCost a b
     |length b == 0 = error "empty path"
     |length b == 1 = getWeightVertex a (b!!0)
     |length b == 2 = (getWeightVertex a (b!!0)) `plus` (getWeightVertex a (b!!1)) `plus` (getWeightEdge a (b!!0) (b!!1)) 
     |otherwise = pathCost' a (tail b) ((getWeightVertex a (b!!0)) `plus` (getWeightEdge a (b!!0) (b!!1)))
 
-pathCost' :: (Num w) => Dag w -> [Int] -> Weight w -> Weight w
+pathCost' :: (Num w, Ord w) => Dag w -> [Int] -> Weight w -> Weight w
 pathCost' a b c
     |length b == 0 = c
     |length b == 1 = getWeightVertex a (b!!0) `plus` c
@@ -98,36 +98,31 @@ getWeightEdge :: Dag w -> Origin -> Destination -> Weight w
 getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
 
 
-longestPath :: Dag w -> Int -> Int -> [Int]
+longestPath :: (Ord w, Num w) =>  Dag w -> Int -> Int -> [Int]
 longestPath a b c = longestPath' a (chopList (topoSort a) b c) b c
 
-longestPath' :: Dag w -> [Int] -> Int -> Int -> [Int] 
+longestPath' :: (Ord w, Num w) => Dag w -> [Int] -> Int -> Int -> [Int] 
 longestPath' a b c d 
-    | c == d = [d]
-    | otherwise = maximumBy (comparing (pathCost a b)) 
-                  [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c),
-                             let start' = ((tail b)!!0) 
-                                 g' = tail b
-                                 path = longestPath' a g' start' d ]
-
+    | c == d = [d]  
+    | otherwise = maximumBy (comparing (pathCost a)) [ e:(longestPath' a (tail b) ((tail b)!!0) d) | e <- (incomingVertices a c)]
 
 
 incomingVertices :: Dag w -> Int -> [Int]
 incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
 
 -- example data
-a = addVertex (Dag [][]) (Weight 10)
-b = addVertex a (Weight 10)
-c = addVertex b (Weight 10)
-d = addVertex c (Weight 10)
-e = addVertex d (Weight 10)
-f = addVertex e (Weight 10)
-g = addVertex f (Weight 10)
-h = addEdge g 5 6 (Weight 10)
-i = addEdge h 6 1 (Weight 10)
+a = addVertex (Dag [][]) (Weight 1) -- 0
+b = addVertex a (Weight 2)          -- 1
+c = addVertex b (Weight 3)          -- 2
+d = addVertex c (Weight 4)          -- 3
+e = addVertex d (Weight 5)          -- 4
+f = addVertex e (Weight 6)          -- 5
+g = addVertex f (Weight 7)          -- 6
+h = addEdge g 5 6 (Weight 8)
+i = addEdge h 6 1 (Weight 9)
 j = addEdge i 0 1 (Weight 10)
-k = addEdge j 0 2 (Weight 10)
-l = addEdge k 1 3 (Weight 10)
-m = addEdge l 2 4 (Weight 10)
-n = addEdge m 2 3 (Weight 10)
-o = addEdge n 3 4 (Weight 10)
+k = addEdge j 0 2 (Weight 11)
+l = addEdge k 1 3 (Weight 12)
+m = addEdge l 2 4 (Weight 13)
+n = addEdge m 2 3 (Weight 14)
+o = addEdge n 3 4 (Weight 15)
