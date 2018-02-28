@@ -76,21 +76,6 @@ pathCost' a b c
     |length b == 1 = getWeightVertex a (b!!0) `plus` c
     |otherwise     = pathCost' a (tail b) (getWeightVertex a (b!!0) `plus` getWeightEdge a (b!!0) (b!!1) `plus` c)
 
-chopList :: [Int] -> Int -> Int -> [Int]
-chopList a b c
-    | b == c = [c]
-    | otherwise = chopList' a b c
-
-chopList' :: [Int] -> Int -> Int -> [Int]
-chopList' a b c
-    | a!!0 == b && b == c = reverse a
-    | a!!0 == b = chopList' (reverse a) c c
-    | otherwise = chopList' (tail a) b c
-
-
-getOutBoundEdges :: Dag w -> Origin -> [Edge w]
-getOutBoundEdges b a = filter (\edge -> origin edge == a) (edges b)
-
 getWeightVertex :: Dag w -> Id -> Weight w
 getWeightVertex b a = vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
 
