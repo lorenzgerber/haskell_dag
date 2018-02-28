@@ -114,7 +114,19 @@ incomingVertices :: Dag w -> Int -> [Int]
 incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
 
 
+--takes a dag and a number sequence and checks
+--if it is valid edge sequence in the dag a
+possible :: Dag w -> [Int] -> Bool
+possible a b = possible' a b b
 
+possible' :: Dag w -> [Int] -> [Int] -> Bool
+possible' a b c
+    | length c == 1 = True
+    | length (filter (\edge -> origin edge == head c && destination edge == ((tail c)!!0)) (edges a)) /= 0 = possible' a b (tail c)
+    | otherwise = False
+
+--takes a dag, a number sequence, start and end in the number
+--sequence and removes unreachable nodes from start to end
 pruneDag :: Dag w -> [Int] -> Int -> Int ->  [Int]
 pruneDag a b c d = pruneDag' a b [] c d
 
