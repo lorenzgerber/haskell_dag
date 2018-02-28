@@ -99,7 +99,7 @@ getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == o
 
 
 longestPath :: (Ord w, Num w) =>  Dag w -> Int -> Int -> [Int]
-longestPath a b c = longestPath' a (pruneDag  a (topoSort a) b c) b c  
+longestPath a b c = longestPath' a (pruneSeq  a (topoSort a) b c) b c  
 
 longestPath' :: (Ord w, Num w) => Dag w -> [Int] -> Int -> Int -> [Int] 
 longestPath' a b c d 
@@ -108,6 +108,19 @@ longestPath' a b c d
                                                        let start' = (tail b)!!0,
                                                        let g' = tail b,
                                                        let path = longestPath' a g' start' d]
+
+longPath :: (Ord w, Num w) => Dag w -> Int -> Int -> [Int]
+longPath a b c = maximumBy (comparing (pathCost a)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
+
+
+pathList :: Dag w -> [Int] -> [[Int]]
+pathList a b = pathList' a (reverse b) [[last b]] 
+
+pathList' :: Dag w -> [Int] -> [[Int]] -> [[Int]]
+pathList' a b c 
+    | length b == 1 = c
+    | otherwise = pathList' a (tail b) $ filter (possible a) $ nub $ concat $ [[x:y] ++ c | x <- (incomingVertices a (head b)), y <- c]
+
 
 
 incomingVertices :: Dag w -> Int -> [Int]
@@ -127,12 +140,24 @@ possible' a b c
 
 --takes a dag, a number sequence, start and end in the number
 --sequence and removes unreachable nodes from start to end
-pruneDag :: Dag w -> [Int] -> Int -> Int ->  [Int]
+pruneSeq :: Dag w -> [Int] -> Int -> Int ->  [Int]
+pruneSeq a b c d = pruneSeq' a b [] c d
+
+pruneSeq' :: Dag w -> [Int] -> [Int] -> Int -> Int -> [Int]
+pruneSeq' a b c d e
+    | head b == e = reverse ([e] ++ c) 
+    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneSeq' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
+    | otherwise = pruneSeq' a (tail b) ((head b):c) d e
+
+
+--takes a dag, a number sequence, start and end in the number
+--sequence and removes unreachable nodes from start to end
+pruneDag :: Dag w -> [Int] -> Int -> Int -> Dag w
 pruneDag a b c d = pruneDag' a b [] c d
 
-pruneDag' :: Dag w -> [Int] -> [Int] -> Int -> Int -> [Int]
+pruneDag' :: Dag w -> [Int] -> [Int] -> Int -> Int -> Dag w
 pruneDag' a b c d e
-    | head b == e = reverse ([e] ++ c) 
+    | head b == e = a
     | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneDag' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
     | otherwise = pruneDag' a (tail b) ((head b):c) d e
 
