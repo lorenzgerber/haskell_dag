@@ -63,18 +63,26 @@ combs _ [] = []
 combs k (x:xs) = map (x:) (combs (k-1) xs) ++ combs k xs
 
 
-pathCost :: (Num w, Ord w) => Dag w -> [Int] -> Weight w
-pathCost a b
-    |length b == 0 = error "empty path"
-    |length b == 1 = getWeightVertex a (b!!0)
-    |length b == 2 = (getWeightVertex a (b!!0)) `plus` (getWeightVertex a (b!!1)) `plus` (getWeightEdge a (b!!0) (b!!1)) 
-    |otherwise = pathCost' a (tail b) ((getWeightVertex a (b!!0)) `plus` (getWeightEdge a (b!!0) (b!!1)))
 
-pathCost' :: (Num w, Ord w) => Dag w -> [Int] -> Weight w -> Weight w
-pathCost' a b c
+longPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
+longPath a b c wV wE = maximumBy (comparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
+
+
+pathCost :: (Num w, Ord w) => Dag w -> WeightVertex w -> WeightEdge w -> [Int] -> Weight w
+pathCost a wV wE b
+    |length b == 0 = error "empty path"
+    |length b == 1 = wV a (b!!0)
+    |length b == 2 = (wV a (b!!0)) `plus` (wV a (b!!1)) `plus` (wE a (b!!0) (b!!1)) 
+    |otherwise = pathCost' a (tail b) ((wV a (b!!0)) `plus` (wE a (b!!0) (b!!1))) wV wE
+
+pathCost' :: (Num w, Ord w) => Dag w -> [Int] -> Weight w -> WeightVertex w -> WeightEdge w -> Weight w
+pathCost' a b c d e
     |length b == 0 = c
-    |length b == 1 = getWeightVertex a (b!!0) `plus` c
-    |otherwise     = pathCost' a (tail b) (getWeightVertex a (b!!0) `plus` getWeightEdge a (b!!0) (b!!1) `plus` c)
+    |length b == 1 = d a (b!!0) `plus` c
+    |otherwise     = pathCost' a (tail b) (d a (b!!0) `plus` e a (b!!0) (b!!1) `plus` c) d e
+
+type WeightVertex w = (Dag w -> Id -> Weight w)
+type WeightEdge w = (Dag w -> Origin -> Destination -> Weight w)
 
 getWeightVertex :: Dag w -> Id -> Weight w
 getWeightVertex b a = vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
@@ -82,20 +90,6 @@ getWeightVertex b a = vWeight $ head $ filter (\vertex -> vId vertex == a) (vert
 getWeightEdge :: Dag w -> Origin -> Destination -> Weight w
 getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
 
-
-longestPath :: (Ord w, Num w) =>  Dag w -> Int -> Int -> [Int]
-longestPath a b c = longestPath' a (pruneSeq  a (topoSort a) b c) b c  
-
-longestPath' :: (Ord w, Num w) => Dag w -> [Int] -> Int -> Int -> [Int] 
-longestPath' a b c d 
-    | c == d = [c]
-    | otherwise = maximumBy (comparing (pathCost a)) [ e:path | e <- (incomingVertices a ((tail b)!!0)),
-                                                       let start' = (tail b)!!0,
-                                                       let g' = tail b,
-                                                       let path = longestPath' a g' start' d]
-
-longPath :: (Ord w, Num w) => Dag w -> Int -> Int -> [Int]
-longPath a b c = maximumBy (comparing (pathCost a)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
 
 
 pathList :: Dag w -> [Int] -> [[Int]]
@@ -145,6 +139,9 @@ pruneDag' a b c d e
     | head b == e = a
     | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneDag' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
     | otherwise = pruneDag' a (tail b) ((head b):c) d e
+
+
+
 
 
 -- example data
