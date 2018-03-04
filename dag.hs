@@ -136,9 +136,15 @@ getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges
 
 -- |weightLongestPath determines the weight of the longest path in a given dag
 --the function requires the accessor functions WeightVertex and WeightEdge to
---be provided as arguments. 
-weightLongestPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
-weightLongestPath a b c wV wE = maximumBy (comparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
+--be provided as arguments.
+weightLongestPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
+weightLongestPath a b c wV wE = pathCost a wV wE $ longestPath a b c wV wE
+
+-- |longestPath determines the longest/most expensive path in a given dag
+--the function requires the accessor functions WeightVertex and WeightEdge to
+--be provided as arguments.
+longestPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
+longestPath a b c wV wE = maximumBy (comparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
 
 -- |pathCost calculates the weight of a path
 --The path is provided as a list of Int that represent the vertex
