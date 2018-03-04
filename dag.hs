@@ -7,7 +7,7 @@
 --freely as long as Num is implemented. Additionally, 
 --functionality to determine weight of the longest path 
 --is provided.
-module DAG
+module Dag
 ( Vertex,
   Edge,
   Dag,
@@ -236,3 +236,14 @@ l = addEdge k 1 3 (Weight 12)
 m = addEdge l 2 4 (Weight 13)
 n = addEdge m 2 3 (Weight 14)
 o = addEdge n 3 4 (Weight 15)
+
+p = weightLongestPath o 6 4 getWeightVertex getWeightEdge
+
+-- example data with cycle
+u = addVertex (Dag [][]) (Weight 1)
+v = addVertex u (Weight 2)
+w = addEdge v 0 1 (Weight 3)
+x = addEdge w 1 0 (Weight 4) 
+
+
+ 
