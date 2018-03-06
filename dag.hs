@@ -50,15 +50,22 @@ data Weight w =  Weight w deriving (Show, Eq, Ord)
 -- |Vertex and Edge Weight extractor functions.
 --Each a function with these type signatures have to be
 --provided for calculating the weight of the longest path
-type WeightVertex w = (Dag w -> Id -> Weight w)
-type WeightEdge w = (Dag w -> Origin -> Destination -> Weight w)
+type WeightVertex w = (Dag w -> Id -> w)
+type WeightEdge w = (Dag w -> Origin -> Destination -> w)
+
+-- |Helper function to extract the actual
+--Type Parameter from parameterized Weight w type
+extractor :: Weight w -> w
+extractor (Weight w) = w
 
 -- |Type aliases for improved readability of the code
 type Id = Int
 type Origin = Int
 type Destination = Int
 
-
+-- |Type Class Plus for implementing polymorphism
+--All types that shall be used as Weight type
+--paramter shall implement Plus w Type Class.
 class Plus w where 
     plus :: w -> w -> Weight w  
 
@@ -71,22 +78,55 @@ instance Plus Integer where
 instance Plus Char where
     plus a b = Weight (chr ((ord a) + (ord b)))
 
+instance (Plus w) => Plus [w] where
+    plus xs ys = (Weight (xs ++ ys))
 
-tester :: Weight w -> w
-tester (Weight w) = w
+-- |Type Class Comp for implementing polymorphism
+--All types that shall be used as Weight type
+--parameter shall implement Comp w Type Class.
+class (Ord w) => Comp w where
+    comp :: w -> w -> Ordering
 
+instance Comp Int where
+    comp x y  
+        | x == y    = EQ
+        | x <= y    = LT
+        | otherwise = GT
+
+instance Comp Integer where
+    comp x y
+        | x == y    = EQ
+        | x <= y    = LT
+        | otherwise = GT
+
+instance Comp Char where
+    comp x y
+        | x == y    = EQ
+        | x <= y    = LT
+        | otherwise = GT
+
+instance (Comp w, Eq w, Ord w) => Comp [w] where
+    comp x y
+        | x == y    = EQ
+        | x <= y    = GT
+        | otherwise = LT
+
+-- |Custom Comparing function to apply Comp w Type Class
+--in maximumBy function
+customComparing :: (Ord w, Comp w) => (b -> w) -> b -> b -> Ordering
+customComparing a b c = comp (a b) (a c)  
 
 -- |implementation of getWeightVertex
 --function to extract weight from Vertices. Is used as function
 --parameter for calculating path weights
-getWeightVertex :: Dag w -> Id -> Weight w
-getWeightVertex b a = vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
+getWeightVertex :: Dag w -> Id -> w
+getWeightVertex b a = extractor $vWeight $ head $ filter (\vertex -> vId vertex == a) (vertices b) 
 
 -- |implementation of getWeightEdge
 --function to extract weight from Edges. Is used as function
 --parameter for calculating path weights.
-getWeightEdge :: Dag w -> Origin -> Destination -> Weight w
-getWeightEdge dag orig dest = eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
+getWeightEdge :: Dag w -> Origin -> Destination -> w
+getWeightEdge dag orig dest = extractor $ eWeight $ head $ filter (\edge -> origin edge == orig && destination edge == dest) (edges dag)
 
 -- |addVertex adds a Vertex with weight to a dag
 --The function creates an numeric id for the added
@@ -150,31 +190,31 @@ getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges
 -- |weightLongestPath determines the weight of the longest path in a given dag
 --the function requires the accessor functions WeightVertex and WeightEdge to
 --be provided as arguments.
-weightLongestPath :: (Plus w, Ord w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
-weightLongestPath a b c wV wE = pathCost a wV wE $ longestPath a b c wV wE
+weightLongestPath :: (Plus w, Ord w, Comp w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
+weightLongestPath a b c wV wE = (Weight (pathCost a wV wE $ longestPath a b c wV wE))
 
 -- |longestPath determines the longest/most expensive path in a given dag
 --the function requires the accessor functions WeightVertex and WeightEdge to
 --be provided as arguments.
-longestPath :: (Plus w, Ord w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
-longestPath a b c wV wE = maximumBy (comparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
+longestPath :: (Plus w, Ord w, Comp w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
+longestPath a b c wV wE = maximumBy (customComparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
 
 -- |pathCost calculates the weight of a path
 --The path is provided as a list of Int that represent the vertex
 --id's of the path to calculate 
-pathCost :: (Plus w) => Dag w -> WeightVertex w -> WeightEdge w -> [Int] -> Weight w
+pathCost :: (Plus w) => Dag w -> WeightVertex w -> WeightEdge w -> [Int] -> w
 pathCost a wV wE b
     |length b == 0 = error "empty path"
-    |length b == 1 = wV a (b!!0)
-    |length b == 2 = plus (tester (plus (tester (wV a (b!!0))) (tester (wV a (b!!1))))) (tester(wE a (b!!0) (b!!1))) 
-    |otherwise = pathCost' a (tail b) (tester((wV a (b!!0))) `plus` tester (wE a (b!!0) (b!!1))) wV wE
+    |length b == 1 = extractor $ (Weight (wV a (b!!0)))
+    |length b == 2 = extractor $ plus (extractor(plus ((wV a (b!!0))) ((wV a (b!!1))))) (wE a (b!!0) (b!!1)) 
+    |otherwise = pathCost' a (tail b) ((wV a (b!!0)) `plus` (wE a (b!!0) (b!!1))) wV wE
 
 -- |helper function to calculate the weight of a given path. 
-pathCost' :: (Plus w) => Dag w -> [Int] -> Weight w -> WeightVertex w -> WeightEdge w -> Weight w
+pathCost' :: (Plus w) => Dag w -> [Int] -> Weight w -> WeightVertex w -> WeightEdge w -> w
 pathCost' a b c d e
-    |length b == 0 = c
-    |length b == 1 = plus (tester(d a (b!!0))) (tester c)
-    |otherwise     = pathCost' a (tail b) (plus (tester(plus (tester(d a (b!!0))) (tester(e a (b!!0) (b!!1)))))  (tester(c))) d e
+    |length b == 0 = extractor c
+    |length b == 1 = extractor $ plus (d a (b!!0)) (extractor c)
+    |otherwise     = pathCost' a (tail b) (plus (extractor(plus (d a (b!!0)) (e a (b!!0) (b!!1))))  (extractor(c))) d e
 
 -- |pathList function is used to build assemble a list with vertex ids of potential
 --pathes. Used to determine the longest path. 
@@ -236,25 +276,22 @@ pruneDag' a b c d e
     | otherwise = pruneDag' a (tail b) ((head b):c) d e
 
 
-
-
-
 -- example data
-a = addVertex (Dag [][]) (Weight 1) -- 0
-b = addVertex a (Weight 2)          -- 1
-c = addVertex b (Weight 3)          -- 2
-d = addVertex c (Weight 4)          -- 3
-e = addVertex d (Weight 5)          -- 4
-f = addVertex e (Weight 6)          -- 5
-g = addVertex f (Weight 7)          -- 6
-h = addEdge g 5 6 (Weight 8)
-i = addEdge h 6 1 (Weight 9)
-j = addEdge i 0 1 (Weight 10)
-k = addEdge j 0 2 (Weight 11)
-l = addEdge k 1 3 (Weight 12)
-m = addEdge l 2 4 (Weight 13)
-n = addEdge m 2 3 (Weight 14)
-o = addEdge n 3 4 (Weight 15)
+a = addVertex (Dag [][]) (Weight 'a') -- 0
+b = addVertex a (Weight 'b')          -- 1
+c = addVertex b (Weight 'c')          -- 2
+d = addVertex c (Weight 'd')          -- 3
+e = addVertex d (Weight 'e')          -- 4
+f = addVertex e (Weight 'f')          -- 5
+g = addVertex f (Weight 'g')          -- 6
+h = addEdge g 5 6 (Weight 'h')
+i = addEdge h 6 1 (Weight 'i')
+j = addEdge i 0 1 (Weight 'j')
+k = addEdge j 0 2 (Weight 'k')
+l = addEdge k 1 3 (Weight 'l')
+m = addEdge l 2 4 (Weight 'm')
+n = addEdge m 2 3 (Weight 'n')
+o = addEdge n 3 4 (Weight 'o')
 
 
 -- example data with cycle
