@@ -24,6 +24,7 @@ import Data.List
 import Data.Maybe
 import Data.Ord
 import Control.Arrow
+import Data.Char
 
 -- |Basic Type DAG
 data Dag w = Dag { vertices :: [ Vertex w ]
@@ -57,11 +58,23 @@ type Id = Int
 type Origin = Int
 type Destination = Int
 
--- |internal function that introduces the type restriction
---for weight types. It is used to sum up weights in the
---weight of longest path function.
-plus :: (Num w) => Weight w -> Weight w -> Weight w
-(Weight a) `plus` (Weight b) = Weight (a + b)
+
+class Plus w where 
+    plus :: w -> w -> Weight w  
+
+instance Plus Int where
+    plus a b = Weight (a + b) 
+
+instance Plus Integer where
+    plus a b = Weight (a + b)
+
+instance Plus Char where
+    plus a b = Weight (chr ((ord a) + (ord b)))
+
+
+tester :: Weight w -> w
+tester (Weight w) = w
+
 
 -- |implementation of getWeightVertex
 --function to extract weight from Vertices. Is used as function
@@ -137,31 +150,31 @@ getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges
 -- |weightLongestPath determines the weight of the longest path in a given dag
 --the function requires the accessor functions WeightVertex and WeightEdge to
 --be provided as arguments.
-weightLongestPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
+weightLongestPath :: (Plus w, Ord w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
 weightLongestPath a b c wV wE = pathCost a wV wE $ longestPath a b c wV wE
 
 -- |longestPath determines the longest/most expensive path in a given dag
 --the function requires the accessor functions WeightVertex and WeightEdge to
 --be provided as arguments.
-longestPath :: (Ord w, Num w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
+longestPath :: (Plus w, Ord w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
 longestPath a b c wV wE = maximumBy (comparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
 
 -- |pathCost calculates the weight of a path
 --The path is provided as a list of Int that represent the vertex
 --id's of the path to calculate 
-pathCost :: (Num w, Ord w) => Dag w -> WeightVertex w -> WeightEdge w -> [Int] -> Weight w
+pathCost :: (Plus w) => Dag w -> WeightVertex w -> WeightEdge w -> [Int] -> Weight w
 pathCost a wV wE b
     |length b == 0 = error "empty path"
     |length b == 1 = wV a (b!!0)
-    |length b == 2 = (wV a (b!!0)) `plus` (wV a (b!!1)) `plus` (wE a (b!!0) (b!!1)) 
-    |otherwise = pathCost' a (tail b) ((wV a (b!!0)) `plus` (wE a (b!!0) (b!!1))) wV wE
+    |length b == 2 = plus (tester (plus (tester (wV a (b!!0))) (tester (wV a (b!!1))))) (tester(wE a (b!!0) (b!!1))) 
+    |otherwise = pathCost' a (tail b) (tester((wV a (b!!0))) `plus` tester (wE a (b!!0) (b!!1))) wV wE
 
 -- |helper function to calculate the weight of a given path. 
-pathCost' :: (Num w, Ord w) => Dag w -> [Int] -> Weight w -> WeightVertex w -> WeightEdge w -> Weight w
+pathCost' :: (Plus w) => Dag w -> [Int] -> Weight w -> WeightVertex w -> WeightEdge w -> Weight w
 pathCost' a b c d e
     |length b == 0 = c
-    |length b == 1 = d a (b!!0) `plus` c
-    |otherwise     = pathCost' a (tail b) (d a (b!!0) `plus` e a (b!!0) (b!!1) `plus` c) d e
+    |length b == 1 = plus (tester(d a (b!!0))) (tester c)
+    |otherwise     = pathCost' a (tail b) (plus (tester(plus (tester(d a (b!!0))) (tester(e a (b!!0) (b!!1)))))  (tester(c))) d e
 
 -- |pathList function is used to build assemble a list with vertex ids of potential
 --pathes. Used to determine the longest path. 
@@ -243,7 +256,6 @@ m = addEdge l 2 4 (Weight 13)
 n = addEdge m 2 3 (Weight 14)
 o = addEdge n 3 4 (Weight 15)
 
-p = weightLongestPath o 6 4 getWeightVertex getWeightEdge
 
 -- example data with cycle
 u = addVertex (Dag [][]) (Weight 1)
