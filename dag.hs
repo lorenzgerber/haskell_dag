@@ -82,6 +82,8 @@ instance Plus Char where
     plus a b = Weight (chr ((ord a) + (ord b)))
 
 instance (Plus w) => Plus [w] where
+    plus [] xs = (Weight xs)
+    plus xs [] = (Weight xs)
     plus xs ys = (Weight (xs ++ ys))
 
 -- |Type Class Comp for implementing polymorphism
@@ -228,7 +230,8 @@ pathList a b = pathList' a (reverse b) [[last b]]
 --combinations of pathes.
 pathList' :: Dag w -> [Int] -> [[Int]] -> [[Int]]
 pathList' a b c 
-    | length b == 1 = c
+    | length b == 1 = [b++x | x <- c]
+    | length (incomingVertices a (head b)) == 0 = pathList' a (tail b) c 
     | otherwise = pathList' a (tail b) $ filter (possible a) $ nub $ concat $ [[x:y] ++ c | x <- (incomingVertices a (head b)), y <- c]
 
 -- |helper function that returns a list of all vertex id's from which
@@ -236,6 +239,9 @@ pathList' a b c
 incomingVertices :: Dag w -> Int -> [Int]
 incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
 
+
+outgoingVertices :: Dag w -> Int -> [Int]
+outgoingVertices a b = map destination (filter (\edge -> origin edge == b) (edges a))
 
 -- |takes a dag and a number sequence and checks
 --if it is valid edge sequence in the dag a
@@ -253,28 +259,85 @@ possible' a b c
 
 -- |takes a dag, a number sequence, start and end in the number
 --sequence and removes unreachable nodes from start to end
-pruneSeq :: Dag w -> [Int] -> Int -> Int ->  [Int]
-pruneSeq a b c d = pruneSeq' a b [] c d
+--pruneSeq :: Dag w -> [Int] -> Int -> Int ->  [Int]
+--pruneSeq a b c d = pruneSeq' a b [] c d
 
 -- |helper function that reqursively prunes a list
 --of a vertex id sequence for unreachable vertices/nodes
-pruneSeq' :: Dag w -> [Int] -> [Int] -> Int -> Int -> [Int]
-pruneSeq' a b c d e
-    | head b == e = reverse ([e] ++ c) 
-    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneSeq' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
-    | otherwise = pruneSeq' a (tail b) ((head b):c) d e
+--pruneSeq' :: Dag w -> [Int] -> [Int] -> Int -> Int -> [Int]
+--pruneSeq' a b c d e
+--    | head b == e = reverse ([e] ++ c) 
+--    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneSeq' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
+--    | otherwise = pruneSeq' a (tail b) ((head b):c) d e
+
 
 -- |takes a dag, a number sequence, start and end in the number
 --sequence and removes unreachable nodes from start to end
+pruneSeq :: Dag w -> [Int] -> Int -> Int ->  [Int]
+pruneSeq a b c d = pruneSeq' a [x | x <- (topoSort a), x/=c, x/=d] c d
+
+pruneSeq' :: Dag w -> [Int] -> Int -> Int -> [Int]
+pruneSeq' a b c d = pruneSeq'' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
+
+-- |helper function that reqursively prunes a list
+--of a vertex id sequence for unreachable vertices/nodes
+pruneSeq'' :: Dag w -> [Int] -> Int -> Int -> [Int]
+pruneSeq'' a b c d 
+    | length [x | x <- b, length (incomingVertices a x) == 0] == 0 = [c]++b++[d]  
+    | otherwise = pruneSeq' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
+
+
+
+
 pruneDag :: Dag w -> [Int] -> Int -> Int -> Dag w
-pruneDag a b c d = pruneDag' a b [] c d
+pruneDag a b c d = pruneDag' a [x | x <- (topoSort a), x/=c, x/=d] c d
+
+
+pruneDag' :: Dag w -> [Int] -> Int -> Int -> Dag w
+pruneDag' a b c d = pruneDag'' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
+
+
+
+pruneDag'' :: Dag w -> [Int] -> Int -> Int -> Dag w
+pruneDag'' a b c d
+    | length [x | x <- b, length (incomingVertices a x) == 0] == 0 = a
+    | otherwise = pruneDag' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
+
+
+
+-- |takes a dag, a number sequence, start and end in the number
+--sequence and removes unreachable nodes from start to end
+--pruneDag :: Dag w -> [Int] -> Int -> Int -> Dag w
+--pruneDag a b c d = pruneDag' a b [] c d
 
 -- |helper function that recursively prunes a dag for
 --unreachable vertices given the provided sequence of
 --vertex id's. 
-pruneDag' :: Dag w -> [Int] -> [Int] -> Int -> Int -> Dag w
-pruneDag' a b c d e
-    | head b == e = a
-    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneDag' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
-    | otherwise = pruneDag' a (tail b) ((head b):c) d e
+--pruneDag' :: Dag w -> [Int] -> [Int] -> Int -> Int -> Dag w
+--pruneDag' a b c d e
+--    | head b == e = a
+--    | length (incomingVertices a (head b)) == 0 && (head b) /= d = pruneDag' (Dag (vertices a) (filter (\edge -> origin edge /= head b) (edges a))) (tail b) c d e
+--    | otherwise = pruneDag' a (tail b) ((head b):c) d e
+
+
+
+
+s1 = addVertex (Dag [][]) (Weight 1) --a, 0
+s2 = addVertex s1 (Weight 1)         --b, 1
+s3 = addVertex s2 (Weight 1)         --c, 2
+s4 = addVertex s3 (Weight 1)         --d, 3
+s5 = addVertex s4 (Weight 1)         --e, 4
+s6 = addVertex s5 (Weight 1)         --f, 5
+s7 = addEdge s6 0 1 (Weight 1)
+s8 = addEdge s7 0 2 (Weight 1)
+s9 = addEdge s8 1 3 (Weight 1)
+s10 = addEdge s9 2 3 (Weight 1)
+s11 = addEdge s10 2 4 (Weight 1)
+s12 = addEdge s11 3 5 (Weight 1)
+s13 = addEdge s12 4 5 (Weight 1)
+
+--sWeight = weightLongestPath s13 0 5 getWeightVertex getWeightEdge
+
+
+
  
