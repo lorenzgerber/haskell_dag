@@ -198,11 +198,8 @@ getOrigins edges = foldl (\acc x -> (origin x):acc ) [] edges
 weightLongestPath :: (Plus w, Ord w, Comp w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> Weight w
 weightLongestPath a b c wV wE = (Weight (pathCost a wV wE $ longestPath a b c wV wE))
 
--- |longestPath determines the longest/most expensive path in a given dag
---the function requires the accessor functions WeightVertex and WeightEdge to
---be provided as arguments.
-longestPath :: (Plus w, Ord w, Comp w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w ->  [Int]
-longestPath a b c wV wE = maximumBy (customComparing (pathCost a wV wE)) $ pathList (pruneDag a (topoSort a) b c) (pruneSeq a (topoSort a) b c)
+longestPath :: (Plus w, Ord w, Comp w) => Dag w -> Int -> Int -> WeightVertex w -> WeightEdge w -> [Int]
+longestPath a b c wV wE = maximumBy (customComparing (pathCost a wV wE)) $ pathList a $ chopStartEnd b c $ topoSort a
 
 -- |pathCost calculates the weight of a path
 --The path is provided as a list of Int that represent the vertex
@@ -234,15 +231,21 @@ pathList' a b c
     | length (incomingVertices a (head b)) == 0 = pathList' a (tail b) c 
     | otherwise = pathList' a (tail b) $ filter (possible a) $ nub $ concat $ [[x:y] ++ c | x <- (incomingVertices a (head b)), y <- c]
 
+
+chopStartEnd :: Int -> Int -> [Int] -> [Int]
+chopStartEnd a b c = reverse $ removeUpTo b $ reverse (removeUpTo a c)
+
+
+removeUpTo :: Int -> [Int] -> [Int]
+removeUpTo a (x:xs)
+    | a == x = (x:xs)
+    | otherwise   = removeUpTo a xs
+ 
+
 -- |helper function that returns a list of all vertex id's from which
 --the vertex with the provided id has incoming connections
 incomingVertices :: Dag w -> Int -> [Int]
 incomingVertices a b  = map origin (filter (\edge -> destination edge == b) (edges a))
-
--- |helper function that returns a list of all vertex id's to which
---the vertex with provided id has outgoing connections
-outgoingVertices :: Dag w -> Int -> [Int]
-outgoingVertices a b = map destination (filter (\edge -> origin edge == b) (edges a))
 
 -- |takes a dag and a number sequence and checks
 --if it is valid edge sequence in the dag a
@@ -258,62 +261,35 @@ possible' a b c
     | length (filter (\edge -> origin edge == head c && destination edge == ((tail c)!!0)) (edges a)) /= 0 = possible' a b (tail c)
     | otherwise = False
 
--- |takes a dag, a number sequence, start and end in the number
---sequence and removes unreachable nodes from start to end
-pruneSeq :: Dag w -> [Int] -> Int -> Int ->  [Int]
-pruneSeq a b c d = pruneSeq' a [x | x <- (topoSort a), x/=c, x/=d] c d
-
-pruneSeq' :: Dag w -> [Int] -> Int -> Int -> [Int]
-pruneSeq' a b c d = pruneSeq'' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
-
--- |helper function that reqursively prunes a list
---of a vertex id sequence for unreachable vertices/nodes
-pruneSeq'' :: Dag w -> [Int] -> Int -> Int -> [Int]
-pruneSeq'' a b c d 
-    | length [x | x <- b, length (incomingVertices a x) == 0] == 0 = [c]++b++[d]  
-    | otherwise = pruneSeq' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
-
-
-pruneDag :: Dag w -> [Int] -> Int -> Int -> Dag w
-pruneDag a b c d = pruneDag' a [x | x <- (topoSort a), x/=c, x/=d] c d
-
-pruneDag' :: Dag w -> [Int] -> Int -> Int -> Dag w
-pruneDag' a b c d = pruneDag'' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
-
-pruneDag'' :: Dag w -> [Int] -> Int -> Int -> Dag w
-pruneDag'' a b c d
-    | length [x | x <- b, length (incomingVertices a x) == 0] == 0 = a
-    | otherwise = pruneDag' (Dag (vertices a) ((filter (\edge -> elem (origin edge) [x | x <- b, (length ((incomingVertices a) x)) /= 0] ) (edges a))++  (filter (\edge -> (origin edge) == 0 && elem (destination edge) [x | x <- b, (length ((outgoingVertices a) x)) /= 0 ] ) (edges a))    ))    [x | x <- b, (length (incomingVertices a x)) /= 0] c d
-
  
-a = addVertex (Dag [][]) (Weight (1::Int)) -- 0
-b = addVertex a (Weight 2)          -- 1
-c = addVertex b (Weight 3)          -- 2
-d = addVertex c (Weight 4)          -- 3
-e = addVertex d (Weight 5)          -- 4
-f = addVertex e (Weight 6)          -- 5
-g = addVertex f (Weight 7)          -- 6
-h = addEdge g 5 6 (Weight 8)
-i = addEdge h 6 1 (Weight 9)
-j = addEdge i 0 1 (Weight 10)
-k = addEdge j 0 2 (Weight 11)
-l = addEdge k 1 3 (Weight 12)
-m = addEdge l 2 4 (Weight 13)
-n = addEdge m 2 3 (Weight 14)
-o = addEdge n 3 4 (Weight 15)
+--a = addVertex (Dag [][]) (Weight (1::Int)) -- 0
+--b = addVertex a (Weight 2)          -- 1
+--c = addVertex b (Weight 3)          -- 2
+--d = addVertex c (Weight 4)          -- 3
+--e = addVertex d (Weight 5)          -- 4
+--f = addVertex e (Weight 6)          -- 5
+--g = addVertex f (Weight 7)          -- 6
+--h = addEdge g 5 6 (Weight 8)
+--i = addEdge h 6 1 (Weight 9)
+--j = addEdge i 0 1 (Weight 10)
+--k = addEdge j 0 2 (Weight 11)
+--l = addEdge k 1 3 (Weight 12)
+--m = addEdge l 2 4 (Weight 13)
+--n = addEdge m 2 3 (Weight 14)
+--o = addEdge n 3 4 (Weight 15)
 
 
-s1 = addVertex (Dag [][]) (Weight "c") --a, 0
-s2 = addVertex s1 (Weight "c")         --b, 1
-s3 = addVertex s2 (Weight "c")         --c, 2
-s4 = addVertex s3 (Weight "c")         --d, 3
-s5 = addVertex s4 (Weight "c")         --e, 4
-s6 = addVertex s5 (Weight "c")         --f, 5
-s7 = addEdge s6 0 1 (Weight "c")
-s8 = addEdge s7 0 2 (Weight "c")
-s9 = addEdge s8 1 3 (Weight "a")
-s10 = addEdge s9 2 3 (Weight "b")
-s11 = addEdge s10 2 4 (Weight "a")
-s12 = addEdge s11 3 5 (Weight "d")
-s13 = addEdge s12 4 5 (Weight "a")
+--s1 = addVertex (Dag [][]) (Weight "c") --a, 0
+--s2 = addVertex s1 (Weight "c")         --b, 1
+--s3 = addVertex s2 (Weight "c")         --c, 2
+--s4 = addVertex s3 (Weight "c")         --d, 3
+--s5 = addVertex s4 (Weight "c")         --e, 4
+--s6 = addVertex s5 (Weight "c")         --f, 5
+--s7 = addEdge s6 0 1 (Weight "c")
+--s8 = addEdge s7 0 2 (Weight "c")
+--s9 = addEdge s8 1 3 (Weight "a")
+--s10 = addEdge s9 2 3 (Weight "b")
+--s11 = addEdge s10 2 4 (Weight "a")
+--s12 = addEdge s11 3 5 (Weight "d")
+--s13 = addEdge s12 4 5 (Weight "a")
 
